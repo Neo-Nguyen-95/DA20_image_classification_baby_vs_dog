@@ -14,25 +14,27 @@ from torchvision import datasets, transforms
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 
 from utils import (
-    ConvertToRGB, get_mean_std, train_epoch, train, score, predict
+    ConvertToRGB, get_mean_std, train_epoch, train, score, predict, class_counts
     )
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import random
 
-
 g = torch.Generator()
 g.manual_seed(42)
 batch_size = 16
 
+
 #%% TRANSFORM
+### Speed up with MPS of macbook
 if torch.backends.mps.is_available():
     device='mps'
 else:
     device='cpu'
 
-### Whole dataset load for normalization
+### Normalize dataset loader
+# Get mean of current loader
 transform = transforms.Compose([
     ConvertToRGB(),
     transforms.Resize((224, 224)),
@@ -44,11 +46,12 @@ dataset = datasets.ImageFolder(
     root="data", transform=transform
     )
 
+class_counts(dataset, "Whole dataset")
 
 dataset_loader = DataLoader(dataset, batch_size=batch_size)
 mean, std = get_mean_std(dataset_loader)
 
-### Split data
+# Improve transform -> transform_norm
 transform_norm = transforms.Compose([
     ConvertToRGB(),
     transforms.Resize((224, 224)),
@@ -56,20 +59,38 @@ transform_norm = transforms.Compose([
     transforms.Normalize(mean=mean, std=std)
     ])
 
-train_dataset, val_dataset = random_split(dataset, [0.8, 0.2], generator=g)
-len(dataset)
-len(train_dataset)
-len(val_dataset)
+dataset_norm = datasets.ImageFolder(
+    root="data", transform=transform_norm
+    )
+
+dataset_loader = DataLoader(dataset_norm, batch_size=batch_size)
+
+# Check mean & std after normalization
+mean, std = get_mean_std(dataset_loader)
+print(f"\nData loader:\nMean: {mean},\nStd: {std}")
+
+
+#%% SPLIT
+
+train_dataset, val_dataset = random_split(dataset_norm, [0.8, 0.2], generator=g)
+print(f"Dataset length of {len(dataset_norm)}")
+print(f"Train data length of {len(train_dataset)}, \
+make up of {len(train_dataset)/len(dataset)*100:.1f}%")
+print(f"Validate data length of {len(val_dataset)}, \
+make up of {len(val_dataset)/len(dataset)*100:.1f}%")
+
+class_counts(train_dataset.dataset, 'Training set')
+class_counts(val_dataset.dataset, 'Validating set')
 
 train_loader = DataLoader(
     train_dataset, shuffle=True, batch_size=batch_size, generator=g
     )
 val_loader = DataLoader(
-    val_dataset, shuffle=False, batch_size = batch_size
+    val_dataset, shuffle=False, batch_size=batch_size
     )
 
 batch_shape = next(iter(dataset_loader))[0].shape
-print("batch shape:", batch_shape)
+print("Batch shape:", batch_shape)
 
 #%% CNN structure
 torch.manual_seed(42)
@@ -110,10 +131,12 @@ model.append(torch.nn.Dropout())
 output_layer = torch.nn.Linear(100, 2)
 model.append(output_layer)
 
-# 
+# Summarize model structure
 summary(model)
 
+# Move model to MPS
 model.to(device)
+
 #%% OPTIMIZER
 loss_fn = torch.nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -127,17 +150,20 @@ epoch = train(
     device=device
     )
 
-#%%
+#%% POST-TRAIN ANALYSIS
 train_losses, val_losses, train_accuracies, val_accuracies, epoch_count = epoch
 
-plt.plot(pd.Series(train_losses), label='train_loss')
-plt.plot(pd.Series(val_losses), label='val_loss')
-plt.legend()
-plt.show()
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 4))
 
-plt.plot(pd.Series(train_accuracies), label='train_acc')
-plt.plot(pd.Series(val_accuracies), label='val_acc')
-plt.legend()
+ax[0].plot(pd.Series(train_losses), label='train_loss')
+ax[0].plot(pd.Series(val_losses), label='val_loss')
+ax[0].legend()
+
+
+ax[1].plot(pd.Series(train_accuracies), label='train_acc')
+ax[1].plot(pd.Series(val_accuracies), label='val_acc')
+ax[1].legend()
+
 plt.show()
 
 #%%
@@ -171,8 +197,8 @@ plt.tight_layout()
 
 
 #%% SAVING MODEL
-torch.save(model, os.path.join("model", "model_cnn_v1"))
-torch.save(model.state_dict(), os.path.join("model", "state_dict_cnn_v1"))
+torch.save(model, os.path.join("model", "model_cnn_v2"))
+torch.save(model.state_dict(), os.path.join("model", "state_dict_cnn_v2"))
 
 
 

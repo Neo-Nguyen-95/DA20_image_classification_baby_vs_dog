@@ -1,5 +1,5 @@
+# %%
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from PIL import Image
@@ -13,7 +13,11 @@ from torchvision import datasets, transforms
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 from tqdm import tqdm
 
+from collections import Counter
+import pandas as pd
+import matplotlib.pyplot as plt
 
+# %%
 class ConvertToRGB:
     def __call__(self, img):
         if img.mode != "RGB":
@@ -21,24 +25,55 @@ class ConvertToRGB:
         return img
     
     
+# %%
+def class_counts(dataset, chart_title):
+    class_idx = dataset.class_to_idx
+    idx_count = Counter([x[1] for x in dataset.imgs])
+    class_counts = {index: idx_count[value] for index, value in class_idx.items()}
+    
+    pd.Series(class_counts).plot(kind='bar')
+    plt.xlabel("Class")
+    plt.ylabel("Count")
+    plt.title(chart_title)
+    plt.plot()
+    
+    return class_counts
+
+    
+# %%
+
 def get_mean_std(loader):
+
     """Computes the mean and standard deviation of image data.
 
-    Input: a `DataLoader` producing tensors of shape [batch_size, channels, pixels_x, pixels_y]
-    Output: the mean of each channel as a tensor, the standard deviation of each channel as a tensor
-            formatted as a tuple (means[channels], std[channels])"""
+    Input: 
+        a `DataLoader` producing tensors of 
+        shape [batch_size, channels, pixels_x, pixels_y]
+    Output: 
+        the mean of each channel as a tensor, 
+        the standard deviation of each channel as a tensor 
+        formatted as a tuple (means[channels], std[channels])
+    """
 
     channels_sum, channels_squared_sum, num_batches = 0, 0, 0
     for data, _ in tqdm(loader, desc="Computing mean and std", leave=False):
-        channels_sum += torch.mean(data, dim=[0, 2, 3])
+        # User torch.mean(data, dim=[0, 2, 3]) to calculate
+        # tensor([mean_R, mean_G, mean_B])
+        channels_sum += torch.mean(data, dim=[0, 2, 3])  
+        
         channels_squared_sum += torch.mean(data**2, dim=[0, 2, 3])
+        
         num_batches += 1
+        
     mean = channels_sum / num_batches
     std = (channels_squared_sum / num_batches - mean**2) ** 0.5
 
     return mean, std
 
+
+# %%
 def train_epoch(model, optimizer, loss_fn, data_loader, device="cpu"):
+
     # Report the loss function's average value at the end of the epoch.
     training_loss = 0.0
 

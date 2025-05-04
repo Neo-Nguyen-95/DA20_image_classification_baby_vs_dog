@@ -1,0 +1,7 @@
+pillow == 11.1.0
+pytorch == 2.7.0
+pandas == 2.2.3
+torchinfo == 1.8.0
+torchvision == 0.22.0
+scikit-learn == 1.6.1
+tqdm == 4.67.1
