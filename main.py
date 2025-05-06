@@ -10,6 +10,7 @@ import torchinfo
 from torchinfo import summary
 import torchvision
 from torchvision import datasets, transforms
+from torch.utils.data import Subset
 
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 
@@ -62,6 +63,7 @@ transform_norm = transforms.Compose([
 dataset_norm = datasets.ImageFolder(
     root="data", transform=transform_norm
     )
+class_counts(dataset_norm, 'Whole dataset')
 
 dataset_loader = DataLoader(dataset_norm, batch_size=batch_size)
 
@@ -79,8 +81,6 @@ make up of {len(train_dataset)/len(dataset)*100:.1f}%")
 print(f"Validate data length of {len(val_dataset)}, \
 make up of {len(val_dataset)/len(dataset)*100:.1f}%")
 
-class_counts(train_dataset.dataset, 'Training set')
-class_counts(val_dataset.dataset, 'Validating set')
 
 train_loader = DataLoader(
     train_dataset, shuffle=True, batch_size=batch_size, generator=g
